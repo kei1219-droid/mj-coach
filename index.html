@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>打牌AIコーチ</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0c1410; color: #dde8d8; font-family: sans-serif; min-height: 100vh; }
+
+.header {
+  background: #0a1a0e; border-bottom: 1px solid #1a3a20;
+  padding: 14px 16px; position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-title { font-size: 18px; font-weight: 800; color: #4ade80; }
+.header-sub { font-size: 11px; color: #4a7a50; margin-top: 2px; }
+
+.main { max-width: 560px; margin: 0 auto; padding: 16px 14px 80px; }
+
+/* URL入力エリア */
+.url-section { background: #080e0a; border: 1px solid #1a3a20; border-radius: 14px; padding: 18px 16px; margin-bottom: 14px; }
+.section-label { font-size: 11px; color: #4a7a50; letter-spacing: 1px; margin-bottom: 10px; }
+.url-input {
+  width: 100%; padding: 12px 14px;
+  background: #0a1a0e; border: 1px solid #1a3a20; border-radius: 10px;
+  color: #86efac; font-size: 12px; font-family: monospace;
+  outline: none; margin-bottom: 10px;
+  transition: border-color 0.2s;
+}
+.url-input:focus { border-color: #4ade80; }
+.url-input::placeholder { color: #2a4a2a; }
+
+.kyoku-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.kyoku-btn {
+  flex: 1; padding: 9px 4px; background: #0a1a0e;
+  border: 1px solid #1a3a20; border-radius: 8px;
+  color: #4a7a50; font-size: 12px; cursor: pointer; text-align: center;
+  transition: all 0.15s;
+}
+.kyoku-btn.active { background: #14532d; border-color: #166534; color: #86efac; font-weight: 700; }
+
+.btn-analyze {
+  width: 100%; padding: 15px;
+  background: linear-gradient(135deg, #14532d, #166534);
+  border: none; border-radius: 12px; color: #bbf7d0;
+  font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 2px;
+  box-shadow: 0 4px 14px rgba(74,222,128,0.2);
+}
+.btn-analyze:disabled { background: #1a2a1a; color: #3a5a3a; box-shadow: none; cursor: not-allowed; }
+.btn-analyze:active:not(:disabled) { opacity: 0.85; }
+
+/* 使い方 */
+.howto { background: #080e0a; border: 1px solid #1a3a20; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+.howto-step { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+.howto-step:last-child { margin-bottom: 0; }
+.step-badge {
+  font-size: 11px; font-weight: 800; color: #4ade80;
+  background: #0a1f0e; border: 1px solid #1a3a20;
+  border-radius: 6px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
+}
+.step-text { font-size: 13px; color: #4a7a50; line-height: 1.6; }
+.step-text b { color: #86efac; }
+
+/* ローディング */
+.loading-box {
+  background: #080e0a; border: 2px solid #1a3a20;
+  border-radius: 14px; padding: 32px 16px; text-align: center; display: none;
+}
+.spinner {
+  width: 28px; height: 28px; border: 3px solid #1a3a20;
+  border-top-color: #4ade80; border-radius: 50%;
+  animation: spin 0.7s linear infinite; display: inline-block;
+  vertical-align: middle; margin-right: 10px;
+}
+.loading-step { color: #4a7a50; font-size: 13px; margin-top: 12px; }
+
+/* 結果 */
+.result-section { display: none; }
+
+.result-header {
+  background: linear-gradient(135deg, #0a1f0e, #0f2a14);
+  border: 1px solid #1a3a20; border-radius: 14px;
+  padding: 16px 18px; margin-bottom: 12px;
+}
+.result-kyoku { font-size: 11px; color: #4a7a50; margin-bottom: 4px; }
+.result-player { font-size: 16px; font-weight: 800; color: #4ade80; margin-bottom: 8px; }
+.result-summary { font-size: 13px; color: #8aaa88; line-height: 1.8; margin-bottom: 10px; }
+.total-score-row { display: flex; align-items: center; gap: 10px; }
+.total-label { font-size: 11px; color: #4a7a50; }
+.total-val { font-size: 28px; font-weight: 900; }
+.total-bar-bg { flex: 1; background: #0f1f12; border-radius: 4px; height: 6px; }
+.total-bar { height: 6px; border-radius: 4px; transition: width 1s ease; }
+
+/* 巡目カード */
+.turn-card {
+  background: #080e0a; border: 1px solid #1a3a20;
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+  border-left: 3px solid #334155;
+}
+.turn-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.turn-num { font-size: 11px; color: #4a7a50; min-width: 32px; }
+.turn-dahai { font-size: 18px; font-weight: 900; color: #e2e8d0; min-width: 24px; }
+.eval-badge { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 10px; }
+.turn-score { font-size: 14px; font-weight: 700; margin-left: auto; }
+.score-bar-bg { background: #0f1f12; border-radius: 3px; height: 3px; margin-bottom: 8px; }
+.score-bar { height: 3px; border-radius: 3px; }
+.turn-reason { font-size: 12px; color: #6a8a6a; line-height: 1.7; }
+.hand-text { font-size: 11px; color: #3a5a3a; margin-bottom: 4px; font-family: monospace; }
+
+.btn-back {
+  width: 100%; margin-top: 14px; padding: 14px;
+  background: transparent; border: 1px solid #1a3a20;
+  border-radius: 12px; color: #4a7a50; font-size: 14px; cursor: pointer;
+}
+
+/* エラー */
+.error-box {
+  background: #2d0a0a; border: 1px solid #7f1d1d;
+  border-radius: 10px; padding: 12px 14px; color: #fca5a5;
+  font-size: 13px; display: none; margin-top: 12px; line-height: 1.6;
+}
+
+/* 注意書き */
+.notice {
+  background: #0a1505; border: 1px solid #1a3a10;
+  border-radius: 10px; padding: 10px 14px; margin-top: 12px;
+  font-size: 11px; color: #3a6a30; line-height: 1.7;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">🀄 打牌AIコーチ</div>
+    <div class="header-sub">リプレイURLを貼り付けて解析</div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- 使い方 -->
+  <div class="howto" id="howto">
+    <div class="section-label">◆ 使い方</div>
+    <div class="howto-step">
+      <span class="step-badge">①</span>
+      <span class="step-text">mjモバイルのリプレイ画面を開く</span>
+    </div>
+    <div class="howto-step">
+      <span class="step-badge">②</span>
+      <span class="step-text">画面下部の<b>「リプレイURL」</b>をコピー</span>
+    </div>
+    <div class="howto-step">
+      <span class="step-badge">③</span>
+      <span class="step-text">下の入力欄に<b>貼り付け</b>して解析ボタンをタップ</span>
+    </div>
+  </div>
+
+  <!-- URL入力 -->
+  <div class="url-section" id="input-section">
+    <div class="section-label">◆ リプレイURLを貼り付け</div>
+    <input
+      type="url"
+      id="url-input"
+      class="url-input"
+      placeholder="https://pl.sega-mj.com/mj_viewer/replayMatch?..."
+    >
+
+    <div class="section-label" style="margin-bottom:8px">◆ 解析する局</div>
+    <div class="kyoku-row" id="kyoku-row">
+      <div class="kyoku-btn active" data-val="1" onclick="selectKyoku(this)">東1局</div>
+      <div class="kyoku-btn" data-val="2" onclick="selectKyoku(this)">東2局</div>
+      <div class="kyoku-btn" data-val="3" onclick="selectKyoku(this)">東3局</div>
+      <div class="kyoku-btn" data-val="4" onclick="selectKyoku(this)">東4局</div>
+    </div>
+    <div class="kyoku-row">
+      <div class="kyoku-btn" data-val="5" onclick="selectKyoku(this)">南1局</div>
+      <div class="kyoku-btn" data-val="6" onclick="selectKyoku(this)">南2局</div>
+      <div class="kyoku-btn" data-val="7" onclick="selectKyoku(this)">南3局</div>
+      <div class="kyoku-btn" data-val="8" onclick="selectKyoku(this)">南4局</div>
+    </div>
+
+    <button class="btn-analyze" id="btn-analyze" onclick="startAnalyze()">
+      🀄 打牌を解析する
+    </button>
+
+    <div class="notice">
+      ※ このツールはリプレイURLのゲームIDを使ってAI解析を行います。<br>
+      セガのサーバーへのアクセスが制限されている場合、URLパラメータのみで推定解析を行います。
+    </div>
+  </div>
+
+  <!-- ローディング -->
+  <div class="loading-box" id="loading-box">
+    <div><span class="spinner"></span><span style="color:#4ade80;font-size:16px;font-weight:700;vertical-align:middle">解析中…</span></div>
+    <div class="loading-step" id="loading-step">リプレイデータを取得しています</div>
+  </div>
+
+  <!-- エラー -->
+  <div class="error-box" id="error-box"></div>
+
+  <!-- 結果 -->
+  <div class="result-section" id="result-section">
+    <div class="result-header">
+      <div class="result-kyoku" id="r-kyoku"></div>
+      <div class="result-player" id="r-player"></div>
+      <div class="result-summary" id="r-summary"></div>
+      <div class="total-score-row">
+        <span class="total-label">総合スコア</span>
+        <span class="total-val" id="r-total-score"></span>
+        <div class="total-bar-bg"><div class="total-bar" id="r-total-bar" style="width:0%"></div></div>
+        <span style="font-size:11px;color:#4a7a50">/100</span>
+      </div>
+    </div>
+
+    <div id="turns-container"></div>
+
+    <button class="btn-back" onclick="goBack()">← 別の局を解析</button>
+  </div>
+
+</div>
+
+<script>
+const EVAL_STYLE = {
+  "好手":   { color: "#4ade80", bg: "#052e16", border: "#166534" },
+  "普通":   { color: "#94a3b8", bg: "#1e293b", border: "#334155" },
+  "疑問手": { color: "#fbbf24", bg: "#451a03", border: "#92400e" },
+  "悪手":   { color: "#f87171", bg: "#2d0a0a", border: "#7f1d1d" },
+};
+const scoreColor = s => s >= 80 ? "#4ade80" : s >= 60 ? "#a3e635" : s >= 40 ? "#fbbf24" : "#f87171";
+
+let selectedKyoku = "1";
+
+function selectKyoku(el) {
+  document.querySelectorAll(".kyoku-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+  selectedKyoku = el.dataset.val;
+}
+
+function setLoadingStep(text) {
+  document.getElementById("loading-step").textContent = text;
+}
+
+async function startAnalyze() {
+  const url = document.getElementById("url-input").value.trim();
+  if (!url) {
+    showError("リプレイURLを入力してください");
+    return;
+  }
+  if (!url.includes("sega-mj.com") && !url.includes("pl.sega-mj.com")) {
+    showError("mjモバイルのリプレイURL（pl.sega-mj.com/mj_viewer/...）を入力してください");
+    return;
+  }
+
+  // URLに kyoku_select を上書き
+  let targetUrl = url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("kyoku_select", selectedKyoku);
+    targetUrl = u.toString();
+  } catch(_) {}
+
+  // UI切替
+  document.getElementById("input-section").style.display = "none";
+  document.getElementById("howto").style.display = "none";
+  document.getElementById("error-box").style.display = "none";
+  document.getElementById("result-section").style.display = "none";
+  document.getElementById("loading-box").style.display = "block";
+
+  setLoadingStep("リプレイデータを取得しています…");
+
+  setTimeout(() => setLoadingStep("AIが打牌を解析しています…"), 2000);
+  setTimeout(() => setLoadingStep("評価スコアを計算しています…"), 5000);
+
+  try {
+    const res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: targetUrl }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "サーバーエラー");
+
+    document.getElementById("loading-box").style.display = "none";
+    showResult(data.analysis, data.dataFetched);
+  } catch(e) {
+    document.getElementById("loading-box").style.display = "none";
+    document.getElementById("input-section").style.display = "block";
+    document.getElementById("howto").style.display = "block";
+    showError("解析に失敗しました: " + e.message);
+  }
+}
+
+function showResult(analysis, dataFetched) {
+  const sc = scoreColor(analysis.total_score);
+
+  document.getElementById("r-kyoku").textContent = analysis.kyoku || "";
+  document.getElementById("r-player").textContent = analysis.player || "プレイヤー";
+  document.getElementById("r-summary").textContent = analysis.summary || "";
+  document.getElementById("r-total-score").textContent = analysis.total_score;
+  document.getElementById("r-total-score").style.color = sc;
+  document.getElementById("r-total-bar").style.width = analysis.total_score + "%";
+  document.getElementById("r-total-bar").style.background = sc;
+
+  const container = document.getElementById("turns-container");
+  container.innerHTML = "";
+
+  if (!dataFetched) {
+    container.innerHTML = `<div style="background:#1a1a0a;border:1px solid #3a3a10;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#8a8a50;line-height:1.7">
+      ⚠ セガのサーバーから直接牌譜データを取得できませんでした。<br>
+      URLパラメータの情報のみで推定解析しています。より正確な解析には今後の改善を予定しています。
+    </div>`;
+  }
+
+  (analysis.turns || []).forEach(turn => {
+    const ev = EVAL_STYLE[turn.evaluation] || EVAL_STYLE["普通"];
+    const sc2 = scoreColor(turn.score);
+    const card = document.createElement("div");
+    card.className = "turn-card";
+    card.style.borderLeftColor = ev.border;
+    card.innerHTML = `
+      <div class="turn-header">
+        <span class="turn-num">${turn.junme}巡目</span>
+        <span class="turn-dahai">${turn.dahai || "?"}</span>
+        <span class="eval-badge" style="color:${ev.color};background:${ev.bg};border:1px solid ${ev.border}">${turn.evaluation}</span>
+        <span class="turn-score" style="color:${sc2}">${turn.score}<span style="font-size:10px;color:#4a7a50">/100</span></span>
+      </div>
+      ${turn.hand ? `<div class="hand-text">手牌: ${turn.hand}</div>` : ""}
+      <div class="score-bar-bg"><div class="score-bar" style="width:${turn.score}%;background:${sc2}"></div></div>
+      <div class="turn-reason">${turn.reason || ""}</div>
+    `;
+    container.appendChild(card);
+  });
+
+  document.getElementById("result-section").style.display = "block";
+  window.scrollTo(0, 0);
+}
+
+function showError(msg) {
+  const el = document.getElementById("error-box");
+  el.textContent = msg;
+  el.style.display = "block";
+}
+
+function goBack() {
+  document.getElementById("result-section").style.display = "none";
+  document.getElementById("input-section").style.display = "block";
+  document.getElementById("howto").style.display = "block";
+  document.getElementById("error-box").style.display = "none";
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

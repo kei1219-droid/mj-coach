@@ -1,0 +1,8 @@
+{
+  "name": "mj-coach",
+  "version": "1.0.0",
+  "description": "セガNET麻雀MJ 打牌AIコーチ",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0"
+  }
+}
